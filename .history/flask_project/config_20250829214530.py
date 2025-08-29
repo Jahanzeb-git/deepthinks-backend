@@ -6,15 +6,15 @@ BASE_DIR = os.path.abspath(os.path.dirname(__file__))
 
 # --- CORE SETTINGS ---
 DATABASE = os.path.join(BASE_DIR, 'deepthinks.db')
-SECRET_KEY = os.getenv('JWT_SECRET_KEY')
+SECRET_KEY = os.getenv('JWT_SECRET_KEY', 'd9d41e7391af3dc0868618f136b94f7d')
 
 # ---JWT SETTING ---
 ALGORITHM = 'HS256'
 ACCESS_TOKEN_EXPIRE_DAYS = 180
 
 # --- API KEYS AND SERVICE CONFIG ---
-GOOGLE_CLIENT_ID = os.getenv('GOOGLE_CLIENT_ID')
-TOGETHER_API_KEY = os.getenv('TOGETHER_API_KEY')
+GOOGLE_CLIENT_ID = os.getenv('GOOGLE_CLIENT_ID', '1061742468081-1g389n9i177f9vk95eg88tsornpfsbm4.apps.googleusercontent.com')
+TOGETHER_API_KEY = os.getenv('TOGETHER_API_KEY','76fc8053194685a65fb8d82f723d046e9c99d79a803efbe88a55a2169f2ba63d')
 
 # -- LLM MODEL CONFIG ---
 DEFAULT_LLM = "Qwen/Qwen3-235B-A22B-Instruct-2507-tput"

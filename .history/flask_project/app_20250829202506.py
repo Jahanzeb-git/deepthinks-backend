@@ -1,4 +1,5 @@
 import logging
+import os
 from flask import Flask
 from flask_cors import CORS
 from pathlib import Path
@@ -65,4 +66,5 @@ def create_app():
 # For production (like PythonAnywhere), you would point your WSGI server to the `app` object.
 if __name__ == '__main__':
     app = create_app()
-    app.run(host='0.0.0.0', port=5000, debug=True)
+    debug_mode = os.environ.get('FLASK_ENV') == 'development'
+    app.run(host='0.0.0.0', port=5000, debug=debug_mode)

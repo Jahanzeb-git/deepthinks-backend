@@ -1,53 +1,52 @@
 # Deepthinks Chatbot Backend
 
-A production-ready, containerized Flask backend for a conversational AI chatbot. This application features secure JWT-based authentication with Google OAuth, integration with the Together AI API for large language model responses, and a persistent SQLite database running in high-concurrency WAL mode. The project is served with a Gunicorn WSGI server for easy and reliable deployment.
+A production-ready, containerized Flask backend for a sophisticated conversational AI chatbot. This application features a state-of-the-art, token-aware memory system, multiple operational modes (including a specialized code generation mode), secure JWT-based authentication with Google OAuth, and integration with the Together AI API. The project is served with a Gunicorn WSGI server for high-concurrency and is fully containerized with Docker for easy and reliable deployment.
 
 ## Core Features
 
 - **Secure Authentication**: Robust user authentication system using JSON Web Tokens (JWT), with support for both traditional email/password signup and Google OAuth 2.0.
-- **RESTful API**: A comprehensive API for chat interactions, session management, user settings, and conversation history.
-- **Together AI Integration**: Seamlessly connects with the Together AI platform to leverage various large language models for generating chat responses.
-- **Advanced Memory System**: A custom, sophisticated memory architecture to provide deep contextual understanding across long conversations (see details below).
+- **Multi-Mode Operation**: The chatbot can operate in different modes (`default`, `reason`, `code`), each utilizing a different underlying LLM and system prompt for optimized performance on various tasks.
+- **Advanced Code Generation**: A specialized `code` mode that uses a powerful coding model and a structured JSON output to deliver production-ready code, complete with file names, versioning, and explanations.
+- **Token-Aware Memory System**: A custom, dynamic memory architecture that intelligently manages context length based on token consumption, ensuring optimal performance and preventing context overflow (see details below).
 - **File Uploads & Processing**: Supports file uploads, including text extraction from PDFs, DOCX, and XLSX files, and image handling for vision-enabled AI models.
 - **Token Usage Analytics**: Endpoints for tracking and analyzing token usage per user, model, and session.
 - **Conversation Sharing**: Functionality to create shareable, password-protected links for conversations.
 - **Production-Ready Deployment**: Containerized with Docker and served by a Gunicorn WSGI server to handle multiple concurrent users efficiently.
 
-## The Memory System
+## The Token-Aware Memory System
 
-The backend features a custom memory system designed to provide the AI with a deep, persistent understanding of the conversation, blending immediate context with long-term knowledge.
+The backend features a highly advanced memory system designed to provide the AI with a deep, persistent understanding of the conversation. Unlike a simple static context window, this system dynamically adapts to the flow of the conversation based on token usage.
 
-### Short-Term Memory
+### Dynamic Short-Term Memory
 
-The short-term memory acts as a high-fidelity buffer, holding the last **k** user-assistant interactions (a turn consists of one user prompt and one AI response). This buffer provides the immediate context for the AI's next response. The value of `k` is configurable in `config.py` (`SHORT_TERM_MEMORY_K`).
+The core of the system is a short-term memory buffer that holds recent interactions. However, the size of this buffer is not fixed. Instead of a static `k` number of turns, the system uses a **token-based adaptive threshold**. Summarization is triggered when the cumulative token count of the interactions in the buffer exceeds a configurable threshold (`MAX_CONTEXT_TOKENS`), ensuring that the context sent to the LLM is always within its processing limits.
 
-### Long-Term Memory
+### Adaptive Pruning & Context Smoothing
 
-Long-term memory is a structured JSON object stored persistently in the database for each conversation session. It is designed to store a condensed, summarized history of the entire conversation. It contains:
-- `interactions`: An array of summarized past conversation turns, including a contextual summary, a verbatim snippet for preserving key details, and a priority score.
-- `important_details`: A list of key facts, entities, and user preferences that are extracted and consolidated over the course of the conversation.
+When the token threshold is reached, an adaptive pruning process is initiated:
 
-### Summarization & Pruning (Context Smoothing)
+1.  **Dynamic `k` Calculation**: The system first calculates a dynamic number of interactions to keep (`dynamic_k`) based on the recent token consumption pattern. This is achieved using an **exponential smoothing algorithm** that gives more weight to recent, more relevant interactions. The formula for the smoothed average tokens per interaction is:
 
-To prevent the context from growing indefinitely, a pruning mechanism is triggered when the short-term memory buffer exceeds `k` interactions. The process works as follows:
+    *AvgTokens = (Î± * CurrentTokens) + ((1 - Î±) * PreviousAvg)*
 
-1.  The oldest interactions in the short-term buffer are selected for summarization.
-2.  These interactions, along with the existing long-term memory summary, are sent to a specialized summarizer LLM.
-3.  The LLM generates a new, updated JSON summary that intelligently integrates the old summary with the new interactions.
-4.  The application then updates the long-term memory with this new summary and prunes the summarized interactions from the short-term buffer.
+    Where `Î±` is the `SMOOTHING_FACTOR`. This allows the system to adapt quickly to changes in conversation density (e.g., switching from short questions to long code snippets).
 
-This process can be thought of as a **context smoothing algorithm**, where the raw, verbose conversation history is continuously distilled into a dense, structured, and highly relevant summary, ensuring the AI always has the most important context available without exceeding token limits.
+2.  **Intelligent Retention**: Based on `dynamic_k`, the system decides which interactions to summarize and which to retain in their raw form in the short-term buffer.
+
+3.  **Summarization**: The interactions marked for pruning are sent to a specialized summarizer LLM, which integrates them into the persistent, long-term memory JSON object.
+
+This entire process ensures a fluid and highly efficient use of the context window, providing the AI with the most relevant information without sacrificing performance or risking context overflow.
 
 ## Technology Stack
 
 - **Backend**: Flask, Gunicorn
 - **Database**: SQLite (with WAL mode enabled)
 - **Containerization**: Docker
-- **Core Libraries**: `PyJWT` for authentication, `together` for AI integration, `google-auth` for OAuth, `pypdf`, `python-docx`, `openpyxl` for file processing.
+- **Core Libraries**: `PyJWT`, `google-auth`, `together`, `pydantic`, `tiktoken`, `python-magic`, `pypdf`, `python-docx`, `openpyxl`.
 
 ## Configuration
 
-To run the application, you must create a `.env` file in the `flask_project` directory. The application will not start without it.
+To run the application, you must create a `.env` file. The application will not start without it.
 
 Create a file named `.env` with the following variables:
 
@@ -61,13 +60,16 @@ GOOGLE_CLIENT_ID=your_google_client_id.apps.googleusercontent.com
 # Your API key for the Together AI platform
 TOGETHER_API_KEY=your_together_api_key
 
+# A key for encrypting user-provided API keys (must be 32 url-safe base64-encoded bytes)
+TOGETHER_KEY_ENC_KEY=your_fernet_encryption_key
+
 # Set to 'development' to enable Flask's debug mode (optional)
 # FLASK_ENV=development
 ```
 
 ## Deployment Guide
 
-This application is designed to be deployed as a Docker container. The following command will pull the image from Docker Hub and run it in a detached, production-ready state.
+This application is designed to be deployed as a Docker container. The following command will pull the latest image from Docker Hub and run it in a detached, production-ready state.
 
 ### Prerequisites
 
@@ -87,14 +89,4 @@ docker run -d \
   --env-file /path/to/your/.env \
   -v /path/to/your/database/deepthinks.db:/app/deepthinks.db \
   jahanzeb833/deepthinks-backend:latest
-```
-
-This command will:
-- Run the container in detached mode (`-d`).
-- Map port 5000 on your server to port 5000 in the container (`-p 5000:5000`).
-- Name the container `deepthinks-backend-container` for easy management.
-- Ensure the container always restarts if it stops (`--restart=always`).
-- Securely pass your secrets to the application using the `.env` file.
-- Persist the database by mounting it from your server's filesystem into the container.
-
 ```

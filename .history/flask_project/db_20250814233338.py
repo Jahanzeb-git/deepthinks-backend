@@ -56,7 +56,6 @@ def init_db():
         prompt TEXT NOT NULL,
         response TEXT NOT NULL,
         timestamp TEXT NOT NULL,
-        token_count INTEGER DEFAULT 0,
         FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE CASCADE
     );
     CREATE TABLE IF NOT EXISTS unauthorized_request_counts (
